@@ -17,8 +17,7 @@ const (
 )
 
 type MongoStoreClient struct {
-	session     *mgo.Session
-	deviceDataC *mgo.Collection
+	session *mgo.Session
 }
 
 func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
@@ -29,8 +28,7 @@ func NewMongoStoreClient(config *mongo.Config) *MongoStoreClient {
 	}
 
 	return &MongoStoreClient{
-		session:     mongoSession,
-		deviceDataC: mongoSession.DB("").C(DEVICE_DATA_COLLECTION),
+		session: mongoSession,
 	}
 }
 
@@ -53,8 +51,11 @@ func (d MongoStoreClient) GetTimeLastEntryUser(groupId string) []byte {
 	var result map[string]interface{}
 	groupIdQuery := bson.M{"$or": []bson.M{bson.M{"groupId": groupId},
 		bson.M{"_groupId": groupId, "_active": true}}}
+	cpy := d.session.Copy()
+	defer cpy.Close()
+
 	// Get the entry with the latest time by reverse sorting and taking the first value
-	d.deviceDataC.Find(groupIdQuery).Sort("-time").One(&result)
+	cpy.DB("").C(DEVICE_DATA_COLLECTION).Find(groupIdQuery).Sort("-time").One(&result)
 	bytes, err := json.Marshal(result["time"])
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
@@ -71,8 +72,12 @@ func (d MongoStoreClient) GetTimeLastEntryUserAndDevice(groupId, deviceId string
 	deviceIdQuery := bson.M{"deviceId": deviceId}
 	// Full query matches groupId and deviceId
 	fullQuery := bson.M{"$and": []bson.M{groupIdQuery, deviceIdQuery}}
+
+	cpy := d.session.Copy()
+	defer cpy.Close()
+
 	// Get the entry with the latest time by reverse sorting and taking the first value
-	d.deviceDataC.Find(fullQuery).Sort("-time").One(&result)
+	cpy.DB("").C(DEVICE_DATA_COLLECTION).Find(fullQuery).Sort("-time").One(&result)
 	bytes, err := json.Marshal(result["time"])
 	if err != nil {
 		log.Print("Failed to marshall event", result, err)
@@ -162,14 +167,14 @@ func (d MongoStoreClient) ExecuteQuery(details *model.QueryData) []byte {
 	// Request a socket connection from the session to process our query.
 	// Close the session when the goroutine exits and put the connection back
 	// into the pool.
-	sessionCopy := d.session.Copy()
-	defer sessionCopy.Close()
+	cpy := d.session.Copy()
+	defer cpy.Close()
 
 	var results []interface{}
 	//we don't want to return the _id
 	filter := bson.M{"_id": 0}
 
-	sessionCopy.DB("").C(DEVICE_DATA_COLLECTION).
+	cpy.DB("").C(DEVICE_DATA_COLLECTION).
 		Find(query).
 		Sort(sort).
 		Select(filter).

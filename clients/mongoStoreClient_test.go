@@ -36,9 +36,9 @@ func TestMongoStore(t *testing.T) {
 	 * INIT THE TEST - we use a clean copy of the collection before we start
 	 */
 
-	mc.deviceDataC.DropCollection()
+	mc.session.DB("").C(DEVICE_DATA_COLLECTION).DropCollection()
 
-	if err := mc.deviceDataC.Create(&mgo.CollectionInfo{}); err != nil {
+	if err := mc.session.DB("").C(DEVICE_DATA_COLLECTION).Create(&mgo.CollectionInfo{}); err != nil {
 		t.Fatalf("We couldn't create the device data collection for these tests ", err)
 	}
 
@@ -55,7 +55,7 @@ func TestMongoStore(t *testing.T) {
 
 		for i := range toLoad {
 			//insert each test data item
-			if insertErr := mc.deviceDataC.Insert(toLoad[i]); insertErr != nil {
+			if insertErr := mc.session.DB("").C(DEVICE_DATA_COLLECTION).Insert(toLoad[i]); insertErr != nil {
 				t.Fatalf("We could not load the test data ", insertErr)
 			}
 		}
